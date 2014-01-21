@@ -264,13 +264,9 @@ try_update_binary(const char *path, ZipArchive *zip) {
 static int
 really_install_package(const char *path)
 {
-    int ret = 0;
-
     ui_set_background(BACKGROUND_ICON_INSTALLING);
     ui_print("Finding update package...\n");
     ui_show_indeterminate_progress();
-
-    set_perf_mode(1);
 
     // Resolve symlink in case legacy /sdcard path is used
     // Requires: symlink uses absolute path
@@ -296,8 +292,7 @@ really_install_package(const char *path)
 
     if (ensure_path_mounted(path) != 0) {
         LOGE("Can't mount %s\n", path);
-        ret = INSTALL_CORRUPT;
-        goto out;
+        return INSTALL_CORRUPT;
     }
 
     ui_print("Opening update package...\n");
@@ -309,8 +304,7 @@ really_install_package(const char *path)
         RSAPublicKey* loadedKeys = load_keys(PUBLIC_KEYS_FILE, &numKeys);
         if (loadedKeys == NULL) {
             LOGE("Failed to load keys\n");
-            ret = INSTALL_CORRUPT;
-            goto out;
+            return INSTALL_CORRUPT;
         }
         LOGI("%d key(s) loaded from %s\n", numKeys, PUBLIC_KEYS_FILE);
 
@@ -326,10 +320,8 @@ really_install_package(const char *path)
         if (err != VERIFY_SUCCESS) {
             LOGE("signature verification failed\n");
             ui_show_text(1);
-            if (!confirm_selection("Install Untrusted Package?", "Yes - Install untrusted zip")) {
-                ret = INSTALL_CORRUPT;
-                goto out;
-            }
+            if (!confirm_selection("Install Untrusted Package?", "Yes - Install untrusted zip"))
+                return INSTALL_CORRUPT;
         }
     }
 
@@ -339,18 +331,13 @@ really_install_package(const char *path)
     err = mzOpenZipArchive(path, &zip);
     if (err != 0) {
         LOGE("Can't open %s\n(%s)\n", path, err != -1 ? strerror(err) : "bad");
-        ret = INSTALL_CORRUPT;
-        goto out;
+        return INSTALL_CORRUPT;
     }
 
     /* Verify and install the contents of the package.
      */
     ui_print("Installing update...\n");
-    ret = try_update_binary(path, &zip);
-
-out:
-    set_perf_mode(0);
-    return ret;
+    return try_update_binary(path, &zip);
 }
 
 int
